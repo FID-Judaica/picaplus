@@ -1,0 +1,3 @@
+(library
+ (name pica_io)
+ (libraries base stdio picaplus re))

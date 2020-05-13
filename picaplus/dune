@@ -1,0 +1,3 @@
+(library
+ (name picaplus)
+ (libraries base re uutf))
