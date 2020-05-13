@@ -18,12 +18,13 @@ let get_first_codepoint str buff =
      end
   | `End -> Error "the string was empty"
   | _ -> Error "didn't get a char from the string"
+;;
 
 let get_first_codepoint_exn str buff =
   match get_first_codepoint str buff with
   | Ok chr -> chr
   | Error msg -> failwith msg
-
+;;
 
 let rec lines_of_ic ic = fun () ->
   match In_channel.input_line ic with
