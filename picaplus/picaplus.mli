@@ -33,17 +33,5 @@ module Record :
       (Subfields.t, [> match_err ]) result
     val find_one_sub : t -> label:string -> tag:char ->
       (string, [> match_err ]) result
-  end
-
-module Title :
-  sig
-    type t = {
-      main : string;
-      sub : string option;
-      name : string option;
-      script : string;
-    }
-    val of_021A_field : Subfields.t -> (t, [> match_err ]) result
-    val s_of_picarecord : Record.t -> t list
-    val repr : t -> string
+    val to_titles : t -> Abstract_fields.Title.t list
   end

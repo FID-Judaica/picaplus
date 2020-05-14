@@ -29,6 +29,20 @@ module Subfields = struct
     | Error _ -> "Latn"
     | Ok script -> script
   ;;
+  let chop_parallel str =
+    match String.lsplit2 str ~on:'=' with
+    | None -> str
+    | Some (str, _) -> str
+  ;;
+  let to_title_of_021A subs =
+    let f main =
+      let main = chop_parallel main in
+      let sub = find_one ~tag:'d' subs >>| chop_parallel |> option_of_result in
+      let name = find_one ~tag:'h' subs |> option_of_result in
+      let script = get_lang subs in
+      Abstract_fields.Title.make ~main ~sub ~name ~script in
+    find_one ~tag:'a' subs >>| f
+  ;;
 end
 
 module Fields = struct
@@ -47,12 +61,10 @@ module Fields = struct
       |> Sequence.map ~f:(Subfields.of_string fld.sub_sep)
       |> Sequence.map ~f:(fun subs -> Subfields.find subs ~tag, subs)
     ;;
-
     let find fld ~tag = find_sequence fld ~tag |> Sequence.to_list
     ;;
-
     let find_one fld ~tag =
-      let not_empty (xs, _) = match xs with [] -> false | _ -> true in
+      let not_empty (xs, _) = not Poly.(xs = []) in
       match Sequence.filter ~f:not_empty (find_sequence fld ~tag)
             |> Sequence.to_list
       with
@@ -97,47 +109,12 @@ module Record = struct
   let find_one_sub record ~label ~tag =
     find_one record ~label >>= Subfields.find_one ~tag
   ;;
-end
-
-module Title = struct
-  type t = {
-      main: string;
-      sub: string option;
-      name: string option;
-      script: string;
-    }
-  ;;
-  let chop_parallel str =
-    match String.lsplit2 str ~on:'=' with
-    | None -> str
-    | Some (str, _) -> str
-  ;;
-  let of_021A_field subs =
-    let f main =
-      let main = chop_parallel main in
-      let sub = Subfields.find_one ~tag:'d' subs >>| chop_parallel in
-      {
-        main;
-        sub = sub |> option_of_result;
-        name = Subfields.find_one ~tag:'h' subs |> option_of_result;
-        script = Subfields.get_lang subs;
-      } in
-    Subfields.find_one ~tag:'a' subs >>| f
-  ;;
-  let s_of_picarecord record =
-    match Record.find record ~label:"021A" with
+  let to_titles record =
+    match find record ~label:"021A" with
     | Error _ -> []
     | Ok flds -> 
        Fields.subs flds
-       |> List.map ~f:of_021A_field
+       |> List.map ~f:Subfields.to_title_of_021A
        |> List.filter_map ~f:option_of_result
   ;;
-  let repr {main; sub; name; _} =
-    let rec repr = function
-        | `Main (main, sub, name) -> main :: repr (`Sub (sub, name))
-        | `Sub (Some sub, name) -> " : " :: sub :: repr (`Name name)
-        | `Sub (None, name) -> repr (`Name name)
-        | `Name (Some name) -> " / " :: name :: []
-        | `Name None -> [] in
-    `Main (main, sub, name) |> repr |> String.concat
 end
