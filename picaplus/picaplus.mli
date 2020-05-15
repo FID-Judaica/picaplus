@@ -7,7 +7,7 @@ module Subfields :
     val of_string : Re.re -> string -> t
     val find : t -> tag:char -> string list
     val find_one : t -> tag:char -> (string, [> match_err ]) result
-    val get_lang : t -> string
+    val get_script : t -> string
   end
 
 module Fields :
