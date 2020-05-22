@@ -88,8 +88,7 @@ module Subfields = struct
             | Ok name -> Some (partial ?first_name:None ~name)
             | _ -> loop tl in
        loop ['8'; 'P'; '9']
-       
-    
+  ;; 
 end
 
 module Fields = struct
@@ -177,14 +176,14 @@ module Record = struct
       List.filter_map creator_codes
         ~f:(fun label -> find record ~label |> result_to_option) in
     let editors = find_numbered record ~label:"028B" in
-    let others = match find record ~label:"208C" with
+    let others = match find record ~label:"028C" with
       | Error _ -> []
       | Ok flds -> [flds] in
     List.concat_map [intellectual_creators; others; editors]
       ~f:(fun flds ->
         List.concat_map ~f:Fields.subs flds
         |> List.filter_map ~f:Subfields.to_person)
-    
+  ;;
   let to_years record =
     match find record ~label:"011@" with
     | Error _ -> []
