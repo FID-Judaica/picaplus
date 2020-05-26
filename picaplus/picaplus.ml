@@ -169,7 +169,7 @@ module Record = struct
        |> List.map ~f:Subfields.to_title
        |> List.filter_map ~f:result_to_option
   ;;
-  let to_creator_ppl record =
+  let to_creator_ppl ?(sub_func=Subfields.to_person) record =
     let intellectual_creators =
       List.filter_map creator_codes
         ~f:(fun label -> find record ~label |> result_to_option) in
@@ -178,9 +178,8 @@ module Record = struct
       | Error _ -> []
       | Ok flds -> [flds] in
     List.concat_map [intellectual_creators; others; editors]
-      ~f:(fun flds ->
-        List.concat_map ~f:Fields.subs flds
-        |> List.filter_map ~f:Subfields.to_person)
+      ~f:(fun flds -> List.concat_map ~f:Fields.subs flds
+                      |> List.filter_map ~f:sub_func)
   ;;
   let to_years record =
     match find record ~label:"011@" with
