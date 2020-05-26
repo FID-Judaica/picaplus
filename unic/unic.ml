@@ -20,12 +20,12 @@ let rev_list_of_bytes ?encoding s =
     | `Uchar c -> loop (n+1) (c :: acc) in
   loop 0 []
 
-let array_of_bytes ?encoding s =
+let array_of_bytes ?(init=Uchar.of_int 0) ?(convert=Fun.id) ?encoding s =
   let f (len, list) =
-    let a = Array.make len (Uchar.of_int 0) in
+    let a = Array.make len init in
     let rec loop n = function
       | [] -> a
-      | c :: tl -> Array.unsafe_set a n c;
+      | c :: tl -> Array.unsafe_set a n (convert c);
                    loop (n-1) tl in
     loop (len-1) list in
   Result.map f (rev_list_of_bytes ?encoding s)
@@ -44,3 +44,18 @@ let array_to_bytes a ~buf ~encoding =
       | `Ok -> loop (n+1)
       | `Partial -> Error "buffer full" in
   loop 0
+
+let stripper_factory chars =
+  let open Base in
+  let chars = Hash_set.Poly.of_list (Array.to_list chars) in
+  fun string ->
+  let rec loop start stop step =
+    if start = stop then stop
+    else if Hash_set.mem chars (Array.get string start) then start
+    else loop (start+step) stop step in
+  let len = Array.length string in
+  let front = loop 0 len 1 in
+  let back = loop (len-1) (-1) (-1) + 1 in
+  let sub pos len = Array.sub string ~pos ~len in
+  if front = len then ([||], [||], [||]) else
+    (sub 0 front, sub front (back-front), sub (back) (len-back))
