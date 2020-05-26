@@ -32,8 +32,6 @@ let years_of_date_str str =
       let _, num, _ = num_strip part in
       Caml.int_of_string_opt num)
 
-
-
 module Subfields = struct
   type t = (char * string) list
   let to_list t : (char * string) list = t

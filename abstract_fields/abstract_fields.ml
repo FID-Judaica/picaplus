@@ -9,14 +9,14 @@ module Title = struct
     }
   ;;
   let make ~main ~sub ~name ~script = {main; sub; name; script}
+
+  let repr tl sep = function
+    | None -> tl
+    | Some s -> sep :: s :: tl
   let repr {main; sub; name; _} =
-    let rec repr = function
-        | `Main (main, sub, name) -> main :: repr (`Sub (sub, name))
-        | `Sub (Some sub, name) -> " : " :: sub :: repr (`Name name)
-        | `Sub (None, name) -> repr (`Name name)
-        | `Name (Some name) -> " / " :: name :: []
-        | `Name None -> [] in
-    `Main (main, sub, name) |> repr |> String.concat
+    let tl = repr [] "/" name in
+    let tl = repr tl ":" sub in
+    String.concat(main :: tl)
 end
 
 module Person = struct
