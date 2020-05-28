@@ -90,10 +90,9 @@ module Subfields = struct
 end
 
 module Fields = struct
-  type t = {
-      data: string list;
-      sub_sep: Re.re
-    }
+  type t = { data: string list
+           ; sub_sep: Re.re
+           }
   ;;
   let make data sub_sep = {data; sub_sep}
   ;;
@@ -120,11 +119,10 @@ end
 
 module Record = struct
   let creator_codes = ["028A"; "028@"; "028P"]
-  type t = {
-      ppn: string;
-      fields: string list string_tbl;
-      sub_sep: Re.re
-    }
+  type t = { ppn: string
+           ; fields: string list string_tbl
+           ; sub_sep: Re.re
+           }
   ;;
   let make ppn fields sub_sep = {ppn; fields; sub_sep}
   ;;
@@ -190,3 +188,13 @@ module Record = struct
            List.concat_map subs ~f:(fun (_, date_str) ->
                years_of_date_str date_str))
 end
+
+
+let gnd_pat = Re.Perl.compile_pat "(\\d+)([^*]*).*; ID: (.*)"
+
+let get_gnd_name s =
+  let open Option in
+  let get = Re.Group.get in
+  Re.exec_opt gnd_pat s >>= fun g ->
+  Some (get g 2, [get g 1; get g 3])
+                               
