@@ -64,8 +64,8 @@ module Subfields = struct
   let to_title subs =
     let f main =
       let main = chop_parallel main in
-      let sub = find_one ~tag:'d' subs >>| chop_parallel |> result_to_option in
-      let name = find_one ~tag:'h' subs |> result_to_option in
+      let sub = find_one ~tag:'d' subs >>| chop_parallel |> Result.ok in
+      let name = find_one ~tag:'h' subs |> Result.ok in
       let script = get_script subs in
       Title.make ~main ~sub ~name ~script in
     find_one ~tag:'a' subs >>| f
@@ -76,7 +76,7 @@ module Subfields = struct
     let identifiers = to_person_ppn subs |> Caml.Result.to_list in
     let partial = Person.make ~script:(get_script subs) ~identifiers in
     match get 'a', get 'd' with
-    | Ok name, fn -> Some (partial ?first_name:(result_to_option fn) ~name)
+    | Ok name, fn -> Some (partial ?first_name:(Result.ok fn) ~name)
     | Error _, Ok name -> Some (partial ?first_name:None ~name)
     | Error _, Error _ ->
        let rec loop = function
@@ -165,12 +165,12 @@ module Record = struct
     | Ok flds -> 
        Fields.subs flds
        |> List.map ~f:Subfields.to_title
-       |> List.filter_map ~f:result_to_option
+       |> List.filter_map ~f:Result.ok
   ;;
   let to_creator_ppl ?(sub_func=Subfields.to_person) record =
     let intellectual_creators =
       List.filter_map creator_codes
-        ~f:(fun label -> find record ~label |> result_to_option) in
+        ~f:(fun label -> find record ~label |> Result.ok) in
     let editors = find_numbered record ~label:"028B" in
     let others = match find record ~label:"028C" with
       | Error _ -> []
@@ -187,6 +187,11 @@ module Record = struct
            let subs = Subfields.to_list subs in
            List.concat_map subs ~f:(fun (_, date_str) ->
                years_of_date_str date_str))
+  ;;
+  let get_ppn record =
+    find_one_sub record ~label:"003@" ~tag:'0'
+    |> Result.map_error ~f:(fun _ -> Failure "no ppn")
+    |> Result.ok_exn
 end
 
 
@@ -197,4 +202,3 @@ let get_gnd_name s =
   let get = Re.Group.get in
   Re.exec_opt gnd_pat s >>= fun g ->
   Some (get g 2, [get g 1; get g 3])
-                               
