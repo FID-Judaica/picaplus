@@ -1,0 +1,3 @@
+(executable
+ (name script)
+ (libraries pica_io picaplus abstract_fields))
