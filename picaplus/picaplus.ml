@@ -6,8 +6,6 @@ open Printf
 type 'a string_tbl = (string,'a) Hashtbl.t
 type match_err = [`NoMatch | `MultiMatch]
 
-let result_to_option = Caml.Result.to_option
-
 (* this needs to be reimplemented to handle unicode *)
 let stripper_factory chars =
   let chars = Hash_set.of_list (module Char) chars in

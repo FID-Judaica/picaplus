@@ -35,6 +35,9 @@ module Record :
     val find_one_sub : t -> label:string -> tag:char ->
       (string, [> match_err ]) result
     val to_titles : t -> Abstract_fields.Title.t list
-    val to_creator_ppl : t -> Abstract_fields.Person.t list
+    val to_creator_ppl :
+      ?sub_func:(Subfields.t -> Abstract_fields.Person.t option)
+      -> t -> Abstract_fields.Person.t list
     val to_years : t -> int list
+    val get_ppn : t -> string
   end
