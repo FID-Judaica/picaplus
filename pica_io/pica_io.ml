@@ -46,11 +46,13 @@ let rec get_record_lines lines =
   match lines () with
   | Seq.Nil -> [], None
   | Seq.Cons (line, tl) ->
-     match line with
-     | "" | "\r" -> [], Some tl
-     | line ->
-        let tail, lines = get_record_lines tl in
-               line::tail, lines
+     if String.is_prefix line ~prefix:"Eingabe:"
+     then get_record_lines tl else
+       match line with
+       | "" | "\r" -> [], Some tl
+       | line ->
+          let tail, lines = get_record_lines tl in
+          line::tail, lines
 ;;
 
 let get_record_lines lines =
@@ -91,14 +93,14 @@ let rec record_of_line_record (ppn, lines) ~sub_sep ~buff =
   | Some sub_sep -> Record.of_lines ~ppn ~sub_sep lines
 ;;     
 
-let records_of_lines lines =
+let records_of_lines ?sub_sep lines =
   let buff = Buffer.create 4 in
   Seq.map
-    (record_of_line_record ~buff ~sub_sep:(ref None))
+    (record_of_line_record ~buff ~sub_sep:(ref sub_sep))
     (line_records_of_lines lines)
 
-let records_of_ic ic = records_of_lines (lines_of_ic ic)
-let records_of_filename fn = records_of_ic (In_channel.create fn)
+let records_of_ic ?sub_sep ic = records_of_lines ?sub_sep (lines_of_ic ic)
+let records_of_filename ?sub_sep fn = records_of_ic ?sub_sep (In_channel.create fn)
 
 let _open_seq seq =
   match seq () with
