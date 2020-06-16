@@ -1,6 +1,10 @@
 open StdLabels
 let ws = Re.Perl.compile_pat "^\\s*(.*)\\s*$"
 let strip_whitespace s = Re.replace ws ~f:(fun g -> Re.Group.get g 1) s
+let opt_to_null ~f = function
+  | None -> `Null
+  | Some v -> f v
+let json_string (s: string) : Yojson.t = `String s
 
 module Title = struct
   type t = { main: string
@@ -18,6 +22,14 @@ module Title = struct
     let tl = repr [] "/" name in
     let tl = repr tl ":" sub in
     String.concat ~sep:" " (main :: tl)
+
+  let to_yojson {main; sub; name; script} : Yojson.t =
+    `Assoc
+      [ ("main", `String main)
+      ; ("sub", opt_to_null sub ~f:json_string)
+      ; ("name", opt_to_null name ~f:json_string)
+      ; ("script", `String script)
+      ]
 end
 
 module Person = struct
@@ -44,6 +56,13 @@ module Person = struct
        match String.split_on_char s ~sep:',' |> List.map ~f:strip_whitespace with
        | [name; fn] -> Ok {t with name; first_name = Some fn}
        | _ -> Error t
+  let to_yojson {name; first_name; identifiers; script} : Yojson.t =
+    `Assoc
+      [ ("name", `String name)
+      ; ("first_name", opt_to_null first_name ~f:json_string)
+      ; ("identifiers", `List (List.map ~f:json_string identifiers))
+      ; ("script", `String script)
+      ]
 end
 
 module Publisher = struct (* I'm just a stub *) end
