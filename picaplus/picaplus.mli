@@ -5,6 +5,7 @@ module Subfields :
   sig
     type t
     val to_list : t -> (char * string) list
+    val of_list : (char * string) list -> t
     val of_string : Re.re -> string -> t
     val find : t -> tag:char -> string list
     val find_one : t -> tag:char -> (string, [> match_err ]) result
@@ -34,10 +35,14 @@ module Record :
       (Subfields.t, [> match_err ]) result
     val find_one_sub : t -> label:string -> tag:char ->
       (string, [> match_err ]) result
-    val to_titles : t -> Abstract_fields.Title.t list
+    val to_titles : ?label:string -> t -> Abstract_fields.Title.t list
     val to_creator_ppl :
       ?sub_func:(Subfields.t -> Abstract_fields.Person.t option)
       -> t -> Abstract_fields.Person.t list
     val to_years : t -> int list
     val get_ppn : t -> string
   end
+
+val get_gnd_name : string -> (string * string list) option
+val convert_gnd_person : Abstract_fields.Person.t -> Abstract_fields.Person.t
+val person_cleanup : Abstract_fields.Person.t -> Abstract_fields.Person.t

@@ -33,9 +33,10 @@ let years_of_date_str str =
 module Subfields = struct
   type t = (char * string) list
   let to_list t : (char * string) list = t
+  let of_list (l:(char * string) list) : t = l
 
   let of_string sub_sep fld_str : t =
-    let subs = Re.split sub_sep fld_str |> List.tl_exn in
+    let subs = Re.split sub_sep fld_str in
     let kv s = s.[0], (String.sub s ~pos:1 ~len:((String.length s) - 1)) in
     List.map ~f:kv subs
   ;;
@@ -157,13 +158,17 @@ module Record = struct
   let find_one_sub record ~label ~tag =
     find_one record ~label >>= Subfields.find_one ~tag
   ;;
-  let to_titles record =
-    match find record ~label:"021A" with
+  let to_titles ?(label="021A") record =
+    match find record ~label with
     | Error _ -> []
     | Ok flds -> 
        Fields.subs flds
        |> List.map ~f:Subfields.to_title
        |> List.filter_map ~f:Result.ok
+  ;;
+  let to_series record =
+    List.concat_map ["036C"; "036C/00"; "036E/00"]
+      ~f:(fun label -> to_titles ~label record)
   ;;
   let to_creator_ppl ?(sub_func=Subfields.to_person) record =
     let intellectual_creators =
@@ -199,4 +204,28 @@ let get_gnd_name s =
   let open Option in
   let get = Re.Group.get in
   Re.exec_opt gnd_pat s >>= fun g ->
-  Some (get g 2, [get g 1; get g 3])
+  let name = match get g 2 |> String.strip |> String.split ~on:'$' with
+    | [] -> failwith "shouldn't be able to get here"
+    | [n] -> n
+    | head :: fields ->
+       let subs = 
+         let kv s = s.[0], (String.sub s ~pos:1 ~len:((String.length s) - 1)) in
+         List.map ~f:kv fields |> Subfields.of_list in
+        match Subfields.to_person subs with
+        | None -> head
+        | Some p -> Person.comma_name p in
+  let ppn = get g 1 in
+  let gnd = get g 3 in
+  return (name, [ppn; gnd])
+
+let convert_gnd_person p =
+  match get_gnd_name p.Person.name with
+  | None -> p
+  | Some (name, ids) ->
+     {p with Person.name = name; Person.identifiers = ids}
+
+let person_cleanup p =
+  let p = convert_gnd_person p in
+  match Person.comma_split p with
+  | Ok p -> p
+  | Error p -> p
