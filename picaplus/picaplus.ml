@@ -198,7 +198,7 @@ module Record = struct
 end
 
 
-let gnd_pat = Re.Perl.compile_pat "(\\d+)([^*]*).*; ID: (.*)"
+let gnd_pat = Re.Perl.compile_pat "(\\d+X?)([^*]*).*; ID: (.*)"
 
 let get_gnd_name s =
   let open Option in
