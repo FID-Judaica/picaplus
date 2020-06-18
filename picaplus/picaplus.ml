@@ -69,6 +69,13 @@ module Subfields = struct
       Title.make ~main ~sub ~name ~script in
     find_one ~tag:'a' subs >>| f
   ;;
+  let to_publisher subs =
+    let script = get_script subs in
+    match find_one subs ~tag:'n', find subs ~tag:'p' with
+    | Error _, [] -> Error `NoMatch
+    | Error _, place -> Ok (Publisher.make ?name:None ~place ~script)
+    | Ok name, place -> Ok (Publisher.make ~name ~place ~script)
+  ;;                    
   let to_person_ppn subs = find_one ~tag:'9' subs
   let to_person subs =
     let get c = find_one ~tag:c subs in
@@ -114,6 +121,8 @@ module Fields = struct
     | [[x], y] -> Ok (x, y)
     | _ -> Error `MultiMatch
   ;;
+  let map ~f flds =
+    List.filter_map ~f:(fun sub -> Result.ok (f sub)) (subs flds)
 end
 
 module Record = struct
@@ -158,13 +167,13 @@ module Record = struct
   let find_one_sub record ~label ~tag =
     find_one record ~label >>= Subfields.find_one ~tag
   ;;
-  let to_titles ?(label="021A") record =
+  let map ~f ~label record =
     match find record ~label with
     | Error _ -> []
-    | Ok flds -> 
-       Fields.subs flds
-       |> List.map ~f:Subfields.to_title
-       |> List.filter_map ~f:Result.ok
+    | Ok flds -> Fields.map ~f flds
+  ;;
+  let to_titles ?(label="021A") =
+    map ~f:Subfields.to_title ~label
   ;;
   let to_series record =
     List.concat_map ["036C"; "036C/00"; "036E/00"]
@@ -191,10 +200,37 @@ module Record = struct
            List.concat_map subs ~f:(fun (_, date_str) ->
                years_of_date_str date_str))
   ;;
+  let to_publisher record =
+    List.concat_map ["033A"; "033C"]
+      ~f:(fun label -> map ~f:Subfields.to_publisher ~label record)
+  ;;
   let get_ppn record =
     find_one_sub record ~label:"003@" ~tag:'0'
     |> Result.map_error ~f:(fun _ -> Failure "no ppn")
     |> Result.ok_exn
+  ;;
+  let add_if_exits (name, field) l =
+    match field with [] -> l | _ -> (name, `List field) :: l
+  ;;
+  let to_api_json ?(person_cleanup=Fn.id) r : Yojson.t =
+    let titles = to_titles r
+                 |> List.map ~f:(fun t -> `String (Title.repr t)) in
+    let series = to_series r
+                 |> List.map ~f:(fun t -> `String (Title.repr t)) in
+    let people = to_creator_ppl r
+                 |> List.map ~f:(fun p ->
+                        let p = person_cleanup p in
+                        `String (Person.comma_name p)) in
+    let years = to_years r
+                |> List.map ~f:(fun f -> `Int f) in
+    let id = [`String (get_ppn r)] in
+    `Assoc (List.fold_right ~f:add_if_exits ~init:[]
+              [ ("title", titles)
+              ; ("isPartOf", series)
+              ; ("creator", people)
+              ; ("date", years)
+              ; ("identifier", id)
+      ])
 end
 
 

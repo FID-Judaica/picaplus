@@ -41,7 +41,11 @@ module Record :
       ?sub_func:(Subfields.t -> Abstract_fields.Person.t option)
       -> t -> Abstract_fields.Person.t list
     val to_years : t -> int list
+    val to_publisher : t -> Abstract_fields.Publisher.t list
     val get_ppn : t -> string
+    val to_api_json :
+      ?person_cleanup:(Abstract_fields.Person.t -> Abstract_fields.Person.t)
+      -> t -> Yojson.t
   end
 
 val get_gnd_name : string -> (string * string list) option
