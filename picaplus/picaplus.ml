@@ -222,13 +222,23 @@ module Record = struct
                         let p = person_cleanup p in
                         `String (Person.comma_name p)) in
     let years = to_years r
-                |> List.map ~f:(fun f -> `Int f) in
+                |> List.map ~f:(fun y -> `Int y) in
+    let publishers =
+      to_publisher r
+      |> List.map ~f:(fun pub ->
+             let words =
+               match pub.Publisher.name with
+               | None -> pub.place
+               | Some name -> name :: pub.place in
+             `String (String.concat ~sep:", " words)
+           ) in
     let id = [`String (get_ppn r)] in
     `Assoc (List.fold_right ~f:add_if_exits ~init:[]
               [ ("title", titles)
               ; ("isPartOf", series)
               ; ("creator", people)
               ; ("date", years)
+              ; ("publisher", publishers)
               ; ("identifier", id)
       ])
 end
