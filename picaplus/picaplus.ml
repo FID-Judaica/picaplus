@@ -240,7 +240,8 @@ module Record = struct
               ; ("date", years)
               ; ("publisher", publishers)
               ; ("identifier", id)
-      ])
+              ]
+      )
 end
 
 

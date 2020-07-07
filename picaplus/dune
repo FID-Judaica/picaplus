@@ -1,3 +1,4 @@
 (library
  (name picaplus)
- (libraries base re abstract_fields yojson))
+ (libraries base re abstract_fields yojson)
+ (preprocess (pps ppx_jane)))

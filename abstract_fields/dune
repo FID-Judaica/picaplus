@@ -1,3 +1,4 @@
 (library
  (name abstract_fields)
- (libraries re yojson))
+ (libraries re yojson)
+ (preprocess (pps ppx_jane)))

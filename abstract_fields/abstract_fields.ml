@@ -1,4 +1,4 @@
-open StdLabels
+open Base
 let ws = Re.Perl.compile_pat "^\\s*(.*)\\s*$"
 let strip_whitespace s = Re.replace ws ~f:(fun g -> Re.Group.get g 1) s
 
@@ -12,7 +12,7 @@ module Title = struct
            ; sub: string option
            ; name: string option
            ; script: string
-           }
+           } [@@deriving sexp]
   ;;
   let make ~main ~sub ~name ~script = {main; sub; name; script}
 
@@ -24,7 +24,8 @@ module Title = struct
     let tl = repr tl ":" sub in
     String.concat ~sep:" " (main :: tl)
   ;;
-  let has_hebrew_script titles = any ~f:(fun t -> t.script = "Hebr") titles
+  let has_hebrew_script titles =
+    any ~f:(fun t -> String.equal t.script "Hebr") titles
 end
 
 module Person = struct
@@ -32,7 +33,7 @@ module Person = struct
            ; first_name: string option
            ; identifiers: string list
            ; script: string
-           }
+           } [@@deriving sexp]
   ;;
   let make ?first_name ~name ~identifiers ~script =
     {name; first_name; identifiers; script}
@@ -48,7 +49,7 @@ module Person = struct
     match t.name, t.first_name with
     | _, Some _ -> Ok t
     | s, _ ->
-       match String.split_on_char s ~sep:',' |> List.map ~f:strip_whitespace with
+       match String.split s ~on:',' |> List.map ~f:strip_whitespace with
        | [name; fn] -> Ok {t with name; first_name = Some fn}
        | _ -> Error t
 end
@@ -57,6 +58,6 @@ module Publisher = struct
   type t = { name: string option
            ; place: string list
            ; script: string
-           }
+           } [@@deriving sexp]
   let make ?name ~place ~script = {name; place; script}
 end
