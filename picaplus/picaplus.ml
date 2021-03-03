@@ -6,6 +6,8 @@ open Printf
 type 'a string_tbl = (string,'a) Hashtbl.t
 type match_err = [`NoMatch | `MultiMatch]
 
+let nonfiling_pat = Re.Perl.compile_pat "([^@]+)(\\s)@(.*)"
+
 (* this needs to be reimplemented to handle unicode *)
 let stripper_factory chars =
   let chars = Hash_set.of_list (module Char) chars in
@@ -60,13 +62,21 @@ module Subfields = struct
     | None -> str
     | Some (str, _) -> str
   ;;
+  let separate_nonfiling str =
+    match Re.exec_opt nonfiling_pat str with
+    | None -> (Nonfiling.none, str)
+    | Some groups ->
+      let get = Re.Group.get groups in
+      Nonfiling.make (get 1) (get 2), get 3
+  ;;
   let to_title subs =
     let f main =
-      let main = chop_parallel main in
+      let main' = chop_parallel main in
+      let nonfiling, main'' = separate_nonfiling main' in
       let sub = find_one ~tag:'d' subs >>| chop_parallel |> Result.ok in
       let name = find_one ~tag:'h' subs |> Result.ok in
       let script = get_script subs in
-      Title.make ~main ~sub ~name ~script in
+      Title.make ~main:main'' ~nonfiling ~sub ~name ~script in
     find_one ~tag:'a' subs >>| f
   ;;
   let to_publisher subs =
@@ -204,10 +214,10 @@ module Record = struct
     List.concat_map ["033A"; "033C"]
       ~f:(fun label -> map ~f:Subfields.to_publisher ~label record)
   ;;
-  let get_ppn record =
-    find_one_sub record ~label:"003@" ~tag:'0'
-    |> Result.map_error ~f:(fun _ -> Failure "no ppn")
-    |> Result.ok_exn
+  let get_ppn record = record.ppn
+    (* find_one_sub record ~label:"003@" ~tag:'0'
+     * |> Result.map_error ~f:(fun _ -> Failure "no ppn")
+     * |> Result.ok_exn *)
   ;;
   let add_if_exits (name, field) l =
     match field with [] -> l | _ -> (name, `List field) :: l
@@ -241,7 +251,7 @@ module Record = struct
               ; ("publisher", publishers)
               ; ("identifier", id)
               ]
-      )
+           )
 end
 
 
