@@ -12,6 +12,25 @@ module Subfields :
     val get_script : t -> string
   end
 
+module type FieldsContainer =
+  sig
+    type t
+    val subs : t -> Subfields.t list
+    val subs_sequence : t -> Subfields.t Base.Sequence.t
+  end
+
+module type Fields_t =
+  sig
+    type t
+    val subs : t -> Subfields.t list
+    val find_sequence :
+      t -> tag:char -> (string list * Subfields.t) Base.Sequence.t
+    val find : t -> tag:char -> (string list * Subfields.t) list
+    val find_one : t -> tag:char ->
+      (string * Subfields.t, [> match_err]) Result.t
+    val map : ?label:string -> f:(?label:string -> Subfields.t -> ('a, _) Result.t) -> t -> 'a list
+  end
+
 module Fields :
   sig
     type t

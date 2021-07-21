@@ -128,6 +128,7 @@ module type Fields_t =
     val find : t -> tag:char -> (string list * Subfields.t) list
     val find_one : t -> tag:char ->
       (string * Subfields.t, [> match_err]) Result.t
+    val map : ?label:string -> f:(?label:string -> Subfields.t -> ('a, _) Result.t) -> t -> 'a list
   end
 
 module MakeFields (Container : FieldsContainer) :
@@ -152,7 +153,7 @@ module MakeFields (Container : FieldsContainer) :
     List.filter_map ~f:(fun sub -> Result.ok (f ?label sub)) (subs flds)
 end
 
-module DiagnosticFieldContainer : FieldsContainer = struct
+module DiagnosticFieldContainer = struct
   type t = { data: string list
            ; sub_sep: Re.re
            }
@@ -169,6 +170,7 @@ module DiagnosticFieldContainer : FieldsContainer = struct
 end
 
 module Record = struct
+  module Fields = MakeFields(DiagnosticFieldContainer)
   let creator_codes = ["028A"; "028@"; "028P"]
   type t = { ppn: string
            ; fields: string list string_tbl
@@ -192,7 +194,7 @@ module Record = struct
   let find record ~label =
     match Hashtbl.find record.fields label with
     | None -> Error `NoMatch
-    | Some flds -> Ok (Fields.make flds record.sub_sep)
+    | Some flds -> Ok (DiagnosticFieldContainer.make flds record.sub_sep)
   ;;
   let find_one record ~label =
     find record ~label >>= fun fld ->
