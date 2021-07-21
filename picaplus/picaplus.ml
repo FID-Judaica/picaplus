@@ -112,19 +112,29 @@ module Subfields = struct
   ;; 
 end
 
-module Fields = struct
-  type t = { data: string list
-           ; sub_sep: Re.re
-           }
-  ;;
-  let make data sub_sep = {data; sub_sep}
-  ;;
-  let subs flds =
-    List.map ~f:(Subfields.of_string flds.sub_sep) flds.data
-  ;;
-  let find_sequence fld ~tag =
-    Sequence.of_list fld.data
-    |> Sequence.map ~f:(Subfields.of_string fld.sub_sep)
+module type FieldsContainer =
+  sig
+    type t
+    val subs : t -> Subfields.t list
+    val subs_sequence : t -> Subfields.t Base.Sequence.t
+  end
+
+module type Fields_t =
+  sig
+    type t
+    val subs : t -> Subfields.t list
+    val find_sequence :
+      t -> tag:char -> (string list * Subfields.t) Base.Sequence.t
+    val find : t -> tag:char -> (string list * Subfields.t) list
+    val find_one : t -> tag:char ->
+      (string * Subfields.t, [> match_err]) Result.t
+  end
+
+module MakeFields (Container : FieldsContainer) :
+  Fields_t with type t := Container.t = struct
+  let subs = Container.subs
+  let find_sequence t ~tag =
+    Container.subs_sequence t
     |> Sequence.map ~f:(fun subs -> Subfields.find subs ~tag, subs)
   ;;
   let find fld ~tag = find_sequence fld ~tag |> Sequence.to_list
@@ -140,6 +150,22 @@ module Fields = struct
   ;;
   let map ?label ~f flds =
     List.filter_map ~f:(fun sub -> Result.ok (f ?label sub)) (subs flds)
+end
+
+module DiagnosticFieldContainer : FieldsContainer = struct
+  type t = { data: string list
+           ; sub_sep: Re.re
+           }
+  ;;
+  let make data sub_sep = {data; sub_sep}
+  ;;
+  let subs t =
+    List.map ~f:(Subfields.of_string t.sub_sep) t.data
+  ;;
+  let subs_sequence t =
+    Sequence.of_list t.data
+    |> Sequence.map ~f:(Subfields.of_string t.sub_sep)
+  ;;
 end
 
 module Record = struct
