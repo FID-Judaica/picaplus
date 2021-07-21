@@ -38,7 +38,7 @@ module Record :
     val to_titles : ?label:string -> t -> Abstract_fields.Title.t list
     val to_series : t -> Abstract_fields.Title.t list
     val to_creator_ppl :
-      ?sub_func:(Subfields.t -> Abstract_fields.Person.t option)
+      ?sub_func:(?label:string -> Subfields.t -> Abstract_fields.Person.t option)
       -> t -> Abstract_fields.Person.t list
     val to_years : t -> int list
     val to_publisher : t -> Abstract_fields.Publisher.t list

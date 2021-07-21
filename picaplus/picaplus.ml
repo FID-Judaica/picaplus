@@ -6,7 +6,7 @@ open Printf
 type 'a string_tbl = (string,'a) Hashtbl.t
 type match_err = [`NoMatch | `MultiMatch]
 
-let nonfiling_pat = Re.Perl.compile_pat "([^@]+)(\\s)@(.*)"
+let nonfiling_pat = Re.Perl.compile_pat "([^@]+?)(\\s*)@(.*)"
 
 (* this needs to be reimplemented to handle unicode *)
 let stripper_factory chars =
@@ -31,6 +31,13 @@ let years_of_date_str str =
     ~f:(fun part ->
       let _, num, _ = num_strip part in
       Caml.int_of_string_opt num)
+
+let unzip l=
+  let out1, out2 =
+    List.fold_left
+      l ~init:([], [])
+      ~f:(fun (acc1, acc2) (el1, el2) -> el1 :: acc1, el2 :: acc2) in
+  List.rev out1, List.rev out2
 
 module Subfields = struct
   type t = (char * string) list
@@ -69,28 +76,28 @@ module Subfields = struct
       let get = Re.Group.get groups in
       Nonfiling.make (get 1) (get 2), get 3
   ;;
-  let to_title subs =
+  let to_title ?label subs =
     let f main =
       let main' = chop_parallel main in
       let nonfiling, main'' = separate_nonfiling main' in
       let sub = find_one ~tag:'d' subs >>| chop_parallel |> Result.ok in
       let name = find_one ~tag:'h' subs |> Result.ok in
       let script = get_script subs in
-      Title.make ~main:main'' ~nonfiling ~sub ~name ~script in
+      Title.make ~main:main'' ~nonfiling ~sub ~name ~script ?field:label in
     find_one ~tag:'a' subs >>| f
   ;;
-  let to_publisher subs =
+  let to_publisher ?label subs =
     let script = get_script subs in
     match find_one subs ~tag:'n', find subs ~tag:'p' with
     | Error _, [] -> Error `NoMatch
-    | Error _, place -> Ok (Publisher.make ?name:None ~place ~script)
-    | Ok name, place -> Ok (Publisher.make ~name ~place ~script)
+    | Error _, place -> Ok (Publisher.make ?name:None ~place ~script ?field:label)
+    | Ok name, place -> Ok (Publisher.make ~name ~place ~script ?field:label)
   ;;                    
   let to_person_ppn subs = find_one ~tag:'9' subs
-  let to_person subs =
-    let get c = find_one ~tag:c subs in
+  let to_person ?label subs =
+    let get sf = find_one ~tag:sf subs in
     let identifiers = to_person_ppn subs |> Caml.Result.to_list in
-    let partial = Person.make ~script:(get_script subs) ~identifiers in
+    let partial = Person.make ?field:label ~script:(get_script subs) ~identifiers in
     match get 'a', get 'd' with
     | Ok name, fn -> Some (partial ?first_name:(Result.ok fn) ~name)
     | Error _, Ok name -> Some (partial ?first_name:None ~name)
@@ -131,8 +138,8 @@ module Fields = struct
     | [[x], y] -> Ok (x, y)
     | _ -> Error `MultiMatch
   ;;
-  let map ~f flds =
-    List.filter_map ~f:(fun sub -> Result.ok (f sub)) (subs flds)
+  let map ?label ~f flds =
+    List.filter_map ~f:(fun sub -> Result.ok (f ?label sub)) (subs flds)
 end
 
 module Record = struct
@@ -180,7 +187,7 @@ module Record = struct
   let map ~f ~label record =
     match find record ~label with
     | Error _ -> []
-    | Ok flds -> Fields.map ~f flds
+    | Ok flds -> Fields.map ~label ~f flds
   ;;
   let to_titles ?(label="021A") =
     map ~f:Subfields.to_title ~label
@@ -192,14 +199,20 @@ module Record = struct
   let to_creator_ppl ?(sub_func=Subfields.to_person) record =
     let intellectual_creators =
       List.filter_map creator_codes
-        ~f:(fun label -> find record ~label |> Result.ok) in
-    let editors = find_numbered record ~label:"028B" in
+        ~f:(fun label ->
+            find record ~label
+            |> Result.map ~f:(fun r -> r, label) |> Result.ok) in
+    let editors = find_numbered record ~label:"028B"
+                  |> List.map ~f:(fun x -> x, "028B") in
     let others = match find record ~label:"028C" with
       | Error _ -> []
-      | Ok flds -> [flds] in
-    List.concat_map [intellectual_creators; others; editors]
-      ~f:(fun flds -> List.concat_map ~f:Fields.subs flds
-                      |> List.filter_map ~f:sub_func)
+      | Ok flds -> [flds, "028C"] in
+    List.concat_map
+      [intellectual_creators; others; editors]
+      ~f:(fun flds -> List.concat_map
+             flds
+             ~f:(fun (fld, label) ->
+                 Fields.subs fld |> List.filter_map ~f:(fun s -> sub_func ~label s)))
   ;;
   let to_years record =
     match find record ~label:"011@" with
@@ -225,30 +238,42 @@ module Record = struct
   let to_api_json ?(person_cleanup=Fn.id) r : Yojson.t =
     let titles = to_titles r
                  |> List.map ~f:(fun t -> `String (Title.repr t)) in
-    let series = to_series r
-                 |> List.map ~f:(fun t -> `String (Title.repr t)) in
-    let people = to_creator_ppl r
-                 |> List.map ~f:(fun p ->
-                        let p = person_cleanup p in
-                        `String (Person.comma_name p)) in
+    let series, series_fields =
+      to_series r
+      |> List.map ~f:(fun t -> `String (Title.repr t), `String (Title.field_or t ""))
+      |> unzip
+    in
+    let people, people_fields =
+      to_creator_ppl r
+      |> List.map
+        ~f:(fun p ->
+            let p = person_cleanup p in
+            `String (Person.comma_name p), `String (Person.field_or p ""))
+      |> unzip
+    in
     let years = to_years r
                 |> List.map ~f:(fun y -> `Int y) in
-    let publishers =
+    let publishers, publisher_fields =
       to_publisher r
       |> List.map ~f:(fun pub ->
              let words =
                match pub.Publisher.name with
                | None -> pub.place
                | Some name -> name :: pub.place in
-             `String (String.concat ~sep:", " words)
-           ) in
+             `String (String.concat ~sep:", " words), `String (Publisher.field_or pub "")
+        )
+      |> unzip
+    in
     let id = [`String (get_ppn r)] in
     `Assoc (List.fold_right ~f:add_if_exits ~init:[]
               [ ("title", titles)
               ; ("isPartOf", series)
+              ; ("_seriesFields", series_fields)
               ; ("creator", people)
+              ; ("_creatorFields", people_fields)
               ; ("date", years)
               ; ("publisher", publishers)
+              ; ("_publisherFields", publisher_fields)
               ; ("identifier", id)
               ]
            )

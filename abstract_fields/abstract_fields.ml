@@ -7,6 +7,11 @@ let rec any ~f = function
   | [] -> false
   | hd :: tl -> if f hd then true else any ~f tl
 ;;
+let this_or_that this_option that =
+  match this_option with
+  | None -> that
+  | Some this -> this
+;;
 module Nonfiling : sig
   type t = (string * string) option
   [@@deriving sexp]
@@ -41,12 +46,13 @@ module Title = struct
     ; nonfiling: Nonfiling.t
     ; sub : string option
     ; name : string option
+    ; field : string option
     ; script : string
     }
   [@@deriving sexp]
 
-  let make ~main ~nonfiling ~sub ~name ~script =
-    { main; nonfiling; sub; name; script }
+  let make ?field ~main ~nonfiling ~sub ~name ~script =
+    { main; nonfiling; sub; name; field; script }
   ;;
   let _add_repr_field tl sep = function
     | None -> tl
@@ -61,7 +67,7 @@ module Title = struct
     let tl = _add_repr_field tl ":" sub in
     String.concat ~sep:" " (main :: tl)
   ;;
-
+  let field_or t = this_or_that t.field
   let has_hebrew_script titles = any ~f:(fun t -> String.equal t.script "Hebr") titles
 end
 
@@ -70,12 +76,13 @@ module Person = struct
     { name : string
     ; first_name : string option
     ; identifiers : string list
+    ; field : string option
     ; script : string
     }
   [@@deriving sexp]
 
-  let make ?first_name ~name ~identifiers ~script =
-    { name; first_name; identifiers; script }
+  let make ?field ?first_name ~name ~identifiers ~script =
+    { name; first_name; identifiers; field; script }
   ;;
 
   let or_name t ~f =
@@ -83,6 +90,8 @@ module Person = struct
     | None -> t.name
     | Some fn -> f fn t.name
   ;;
+
+  let field_or t = this_or_that t.field
 
   let natural_name = or_name ~f:(fun fn name -> String.concat ~sep:" " [ fn; name ])
   let comma_name = or_name ~f:(fun fn name -> String.concat ~sep:", " [ name; fn ])
@@ -102,8 +111,10 @@ module Publisher = struct
     { name : string option
     ; place : string list
     ; script : string
+    ; field : string option
     }
   [@@deriving sexp]
 
-  let make ?name ~place ~script = { name; place; script }
+  let make ?field ?name ~place ~script = { name; place; script; field }
+  let field_or t = this_or_that t.field
 end
